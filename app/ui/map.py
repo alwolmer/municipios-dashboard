@@ -34,7 +34,11 @@ def calculate_outer_bounds(geodf):
 
   return expanded_bounds
 
-def generate_colormap(series, discrete=False):
+def generate_colormap(series, alias=None, discrete=False):
+    
+    min_value = series.min()
+    max_value = series.max()
+
     if discrete:
         # Define five colors for the five percentiles
         colors = ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026']
@@ -44,13 +48,14 @@ def generate_colormap(series, discrete=False):
         colormap = cm.StepColormap(
             colors,
             index=percentiles,  # Set the percentiles as index
-            vmin=series.min(),  # Set minimum value for colormap
-            vmax=series.max()   # Set maximum value for colormap
+            vmin=min_value,  # Set minimum value for colormap
+            vmax=max_value   # Set maximum value for colormap
         )
     else:
-        min_value = series.min()
-        max_value = series.max()
         colormap = cm.linear.YlOrRd_09.scale(min_value, max_value)
+
+    caption = alias if alias else series.name
+    colormap.caption = caption
 
     return colormap
 
@@ -84,9 +89,39 @@ def highlight_function(feature):
         'fillOpacity': 1
     }
 
+def scale_features(geodf, column):
+    """Scale features in the GeoDataFrame based on a specified column."""
+    scaled = geodf[column].copy()
 
-def generate_choro_layer(geodf, column, name=None, alias=None, discrete=False):
-    colormap = generate_colormap(geodf[column], discrete)
+    max_value = scaled.max()
+
+    oom = 0  # Order of magnitude
+    if abs(max_value) > 1e6:
+        scaled = scaled / 1e6
+        oom = 6
+    elif abs(max_value) > 1e3:
+        scaled = scaled / 1e3
+        oom = 3
+    
+    scaled = pd.Series(np.round(scaled, 2).astype(float))
+
+    return scaled, oom
+
+def generate_choro_layer(geodf, column, name=None, alias=None, unit=None, discrete=False):
+
+
+    column_scaled = f'{column}_scaled'
+    temp_geodf = geodf.copy()
+
+    scaled, oom = scale_features(geodf, column)
+
+    temp_geodf[column_scaled] = scaled
+
+    colormap = generate_colormap(scaled, alias=alias, discrete=discrete)
+
+    oom_str = "milhões" if oom == 6 else "milhares" if oom == 3 else ""
+
+    colormap.caption = f"{alias} (em {oom_str} de {unit})" if unit and oom_str else f"{alias} (em {unit})" if unit else  f"{alias} (em {oom_str})" if oom_str else alias
 
     if name is None:
         name = column
@@ -94,54 +129,53 @@ def generate_choro_layer(geodf, column, name=None, alias=None, discrete=False):
     if alias is None:
         alias = column
 
-    styled_style_function = functools.partial(style_function, colormap=colormap, column=column, discrete=discrete)
+    styled_style_function = functools.partial(style_function, colormap=colormap, column=column_scaled, discrete=discrete)
+
+    # Format the column values according to Portuguese convention
+    def format_pt_br(val):
+        if isinstance(val, int):
+            try:
+                return f"{val:,}".replace(",", "X").replace(".", ",").replace("X", ".")
+            except Exception:
+                return val
+        elif isinstance(val, float):
+            try:
+                return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            except Exception:
+                return val
+    
+
+    formatted_col = f"{column}_ptbr"
+    temp_geodf[formatted_col] = temp_geodf[column].apply(format_pt_br)
+    tooltip_fields = ['nome_bairro', formatted_col]
+    popup_fields = ['nome_bairro', formatted_col]
+    tooltip_aliases = ['Bairro', alias + (f" ({unit})" if unit else "")]
+    popup_aliases = ['Bairro', alias + (f" ({unit})" if unit else "")]
 
     tooltip = folium.GeoJsonTooltip(
-        fields=['nome_bairro', column],
-        aliases=['Bairro', alias]
+        fields=tooltip_fields,
+        aliases=tooltip_aliases
     )
 
     popup = folium.GeoJsonPopup(
-        fields=['nome_bairro', column],
-        aliases=['Bairro', alias]
+        fields=popup_fields,
+        aliases=popup_aliases
     )
 
     layer = folium.GeoJson(
-        geodf,
+        temp_geodf,
         name=name,
         style_function=styled_style_function,
         highlight_function=highlight_function,
         tooltip=tooltip,
         popup=popup,
-        # show=False,
         show=True,
         control=True,
         max_zoom=16,
         min_zoom=10
     )
 
-    
-    # add legend to the map
-    # colormap.caption = alias
-    # colormap.add_to(layer)
-
     return layer, colormap
-
-    # layer = folium.GeoJson(
-    #     geodf,
-    #     name=name,
-    #     style_function=styled_style_function,
-    #     highlight_function=highlight_function,
-    #     tooltip=folium.features.GeoJsonTooltip(
-    #         fields=['nome_bairro', column],
-    #         aliases=['Bairro', alias]
-    #     ),
-    #     show=False,
-    #     # overlay=False,
-    #     control=True,
-    #     max_zoom=16,
-    #     min_zoom=10
-    # )
 
 
 # def generate_choro_layer(geodf, column, name=None, alias=None, discrete=False):
