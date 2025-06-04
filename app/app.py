@@ -17,8 +17,6 @@ m = generate_base_map(
     st.session_state.geodata,
 )
 
-print(st.session_state.geodata.columns)
-
 MAP_MODES = {
     'basic': {
         'title': 'Dados básicos',
@@ -68,7 +66,7 @@ MAP_MODES = {
                 'binary': True,
                 'description': 'Proporção de indivíduos do sexo masculino em 2022',
                 'other_group': 'feminino',
-                'other_description': 'Proporção de indivíduos do sexo feminino em 2022'
+                'other_description': 'Indivíduos femininos (2022)'
             },
             'pct_brancos_2022': {
                 'alias': 'Brancos (2022)',
@@ -150,7 +148,7 @@ MAP_MODES = {
                 'binary': True,
                 'other_group': 'População 15+ não alfabetizada',
                 'other_description': 'Proporção de indivíduos (15+ anos) não alfabetizados em 2022',
-                'description': 'Proporção de indivíduos (15+ anos) alfabetizados em 2022'
+                'description': 'População 15+ alfabetizada (2022)'
             }
         }
     },
@@ -169,7 +167,7 @@ MAP_MODES = {
                 'year': 2013,
                 'binary': True,
                 'other_group': 'não construída',
-                'other_description': 'Proporção da área total do bairro que não era construída em 2013',
+                'other_description': 'Área não construída (2013)',
                 'description': 'Proporção da área total do bairro que é construída em 2013'
             },
             'media_moradores_domicilios_ocupados_2022': {
@@ -201,6 +199,24 @@ MAP_MODES = {
                 'titles': ['Bairros nobres', 'Bairros de classe média (ou muito heterogêneos)', 'Bairros populares'],
                 'description': 'Aproxima IDH, levando em conta variáveis de renda, educação e expectativa de vida.'
             },
+            'cluster_renda': {
+                'alias': 'Clusters de faixas de distribuição de renda',
+                'features': [('income', 'pct_domicilios_0a05sm_2010'), ('income', 'pct_domicilios_05a3sm_2010'), ('income', 'pct_domicilios_3a10sm_2010')],
+                'titles': ['Bairros de alta renda', 'Bairros de renda média', 'Bairros de baixa renda'],
+                'description': 'Agrupa os bairros de acordo com a distribuição de renda, considerando a proporção de domicílios em diferentes faixas de renda.'
+            },
+            'cluster_idades': {
+                'alias': 'Clusters de faixas etárias',
+                'features': [('demographic', 'pct_menores_2022'), ('demographic', 'pct_adultos_2022'), ('demographic', 'pct_idosos_2022')],
+                'titles': ['Bairros com população idosa', 'Bairros com população adulta', 'Bairros com população jovem'],
+                'description': 'Agrupa os bairros de acordo com a distribuição etária, considerando a proporção de indivíduos em diferentes faixas etárias.'
+            },
+            'cluster_corraca': {
+                'alias': 'Clusters de cor/raça',
+                'features': [('demographic', 'pct_brancos_2022'), ('demographic', 'pct_pardos_2022'), ('demographic', 'pct_pretos_2022'), ('demographic', 'pct_amarelos_2022'), ('demographic', 'pct_indigenas_2022')],
+                'titles': ['Bairros de maioria branca', 'Bairros com presença de pessoas indígenas', 'Bairros de maioria negra', 'Bairros de maioria negra (e maiores índices de pessoas pretas)'],
+                'description': 'Agrupa os bairros de acordo com a distribuição de cor/raça, considerando a proporção de indivíduos que se identificam como brancos, pardos, pretos, amarelos e indígenas.'
+            }
         }
     }
 }
@@ -255,6 +271,28 @@ with upper_right:
         )
     else:
         st.write(selected_data[selected_column]['description'])
+        clusters = sorted(st.session_state.geodata[selected_column].unique())
+        titles = selected_data[selected_column].get('titles', [])
+        features = selected_data[selected_column].get('features', [])
+
+        # Prepare column headers (aliases)
+        col_aliases = [MAP_MODES[cat]['data'][col]['alias'] for cat, col in features]
+
+        # Build table: rows = clusters (titles), columns = features (aliases)
+        table_rows = []
+        for cluster, title in zip(clusters, titles):
+            row = {"Cluster": title}
+            cluster_data = st.session_state.geodata[st.session_state.geodata[selected_column] == cluster]
+            for (cat, col), alias in zip(features, col_aliases):
+                mean_value = cluster_data[col].mean()
+                # .replace(",", "X").replace(".", ",").replace("X", ".")
+                row[alias] = mean_value
+            table_rows.append(row)
+
+        st.table(table_rows)
+                # st.write(f"{MAP_MODES[cat]['data'][col]['alias']}: {st.session_state.geodata.query(f'{selected_column} == {cluster}')[col].mean()}")
+            
+            # st.write(f"### {selected_data[selected_column]['titles'][cluster]}")
 
 # st.write(f"# Indicador Selecionado: {selected_alias}")
 

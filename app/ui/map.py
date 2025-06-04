@@ -177,35 +177,6 @@ def generate_choro_layer(geodf, column, name=None, alias=None, unit=None, discre
 
     return layer, colormap
 
-
-# def generate_choro_layer(geodf, column, name=None, alias=None, discrete=False):
-#     colormap = generate_colormap(geodf[column], discrete)
-
-#     if name is None:
-#         name = column
-
-#     if alias is None:
-#         alias = column
-
-#     styled_style_function = functools.partial(style_function, colormap=colormap, column=column, discrete=discrete)
-
-#     # Create a FeatureGroup with a name (important!)
-#     fg = folium.FeatureGroup(name=name, show=False)
-
-#     geojson = folium.GeoJson(
-#         geodf,
-#         style_function=styled_style_function,
-#         highlight_function=highlight_function,
-#         tooltip=folium.features.GeoJsonTooltip(
-#             fields=['nome_bairro', column],
-#             aliases=['Bairro', alias]
-#         )
-#     )
-
-#     geojson.add_to(fg)
-#     fg.layer_name = name  # important for LayerControl
-#     return fg
-
 # @st.cache_resource
 def generate_base_map(_geodata):
     map_center = calculate_map_center(_geodata)
@@ -224,13 +195,23 @@ def generate_base_map(_geodata):
     )
 
     folium.TileLayer(
-        tiles='http://localhost:4472/{z}/{x}/{y}.png',
-        attr='Offline OSM',
-        name='Offline Tiles',
+        tiles='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attr='OpenStreetMap',
+        name='OpenStreetMap',
         max_zoom=15,
-        min_zoom=12,
+        min_zoom=11,
         overlay=False,
         control=False
     ).add_to(m)
+
+    # folium.TileLayer(
+    #     tiles='http://localhost:4472/{z}/{x}/{y}.png',
+    #     attr='Offline OSM',
+    #     name='Offline Tiles',
+    #     max_zoom=15,
+    #     min_zoom=12,
+    #     overlay=False,
+    #     control=False
+    # ).add_to(m)
 
     return m
